@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b57ff"><title>DIVIDUAL — Recovered Voices Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300..900&display=swap" />
+<link rel="stylesheet" href="style.css"><script src="config.js"></script><script src="core.js"></script>
+</head>
+<body class="archive-page"><div class="stage"><div class="phone">
+  <header class="site-header"><div class="wrap"><a class="brand" href="index.html" aria-label="Dividual home"><div class="mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="currentColor" transform="translate(60 60)"><rect x="-10" y="-52" width="20" height="42" rx="6"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(180)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(60)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(120)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(240)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(300)"/><circle r="7"/></g></svg></div><div class="word">Dividual<span class="tm">TM</span></div></a><nav class="nav" aria-label="Main navigation"><a href="index.html">CREATE</a><a class="active" href="answers.html">READ POEMS</a></nav></div></header>
+  <main class="wrap">
+    <h1>Other voices<span class="accent">.</span></h1>
+    <p class="lead">Poems shared by visitors.</p>
+    <div class="actions archive-filters"><button class="btn" id="showAll">ALL</button><button class="btn ghost" id="showCarried">SAVED (<span id="carriedCount">0</span>)</button></div>
+    <p class="mode-msg" id="mode"></p>
+    <p class="small muted" role="status" id="status">Opening the archive…</p>
+    <div class="archive-grid" id="list" aria-live="polite"></div>
+  </main>
+  <footer class="footer">Dividual Systems<span class="tm">TM</span></footer>
+  <script>
+  (() => {
+    'use strict';
+    const D = window.Dividual;
+    const list = document.getElementById('list');
+    const status = document.getElementById('status');
+    const allBtn = document.getElementById('showAll');
+    const carriedBtn = document.getElementById('showCarried');
+    const carriesKey = 'dividual_carried_v1';
+    let data = [];
+    let filter = 'all';
+    function readCarried() { try { return JSON.parse(localStorage.getItem(carriesKey) || '[]'); } catch { return []; } }
+    let carried = readCarried();
+    document.getElementById('mode').textContent = '';
+    allBtn.onclick = () => { filter = 'all'; update(); };
+    carriedBtn.onclick = () => { filter = 'carried'; update(); };
+    function update() {
+      allBtn.className = 'btn' + (filter === 'all' ? '' : ' ghost');
+      carriedBtn.className = 'btn' + (filter === 'carried' ? '' : ' ghost');
+      document.getElementById('carriedCount').textContent = String(carried.length);
+      list.replaceChildren();
+      const shown = data.filter(p => filter === 'all' || carried.includes(p.id));
+      status.textContent = filter === 'all'
+        ? `${data.length} ${data.length === 1 ? 'poem' : 'poems'}`
+        : `${shown.length} saved ${shown.length === 1 ? 'poem' : 'poems'}`;
+      if (!shown.length) {
+        const empty = document.createElement('div');
+        empty.className = 'panel padded';
+        const title = document.createElement('h2');
+        title.textContent = filter === 'carried' ? 'Nothing saved yet.' : 'No poems yet.';
+        const text = document.createElement('p');
+        text.className = 'muted';
+        text.textContent = filter === 'carried' ? 'Tap the heart on a poem to save it.' : 'Share a poem to start the archive.';
+        empty.append(title, text); list.append(empty);
+        return;
+      }
+      shown.forEach(poem => {
+        const card = document.createElement('article');
+        card.className = 'poem-card';
+        const head = document.createElement('div'); head.className = 'card-head';
+        const id = document.createElement('span'); id.className = 'tag'; id.textContent = D.voiceId(poem.id);
+        const time = document.createElement('time'); time.className = 'small muted';
+        const timestamp = new Date(poem.createdAt || Date.now());
+        time.dateTime = timestamp.toISOString();
+        time.textContent = timestamp.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        head.append(id);
+        const body = document.createElement('div');
+        D.renderPoem(body, [poem.a, poem.b, poem.c]);
+        const footer = document.createElement('div'); footer.className = 'card-footer';
+        const button = document.createElement('button'); button.type = 'button';
+        button.className = 'btn ghost';
+        const already = carried.includes(poem.id);
+        button.textContent = already ? '♥ SAVED' : '♡ SAVE POEM';
+        button.setAttribute('aria-pressed', String(already));
+        button.onclick = () => {
+          carried = carried.includes(poem.id) ? carried.filter(id => id !== poem.id) : [...carried, poem.id];
+          try { localStorage.setItem(carriesKey, JSON.stringify(carried)); } catch { /* disabled storage */ }
+          update();
+        };
+        footer.append(button);
+        card.append(head, body, footer);
+        list.append(card);
+      });
+    }
+    D.watchPoems(poems => { data = poems; update(); }, error => { status.className = 'error'; status.textContent = `Could not open the archive: ${error.message}`; })
+      .catch(error => { status.className = 'error'; status.textContent = `Could not connect: ${error.message}`; });
+  })();
+  </script>
+</div></div></body>
+</html>

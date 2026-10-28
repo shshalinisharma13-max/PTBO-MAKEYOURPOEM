@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DIVIDUAL — Speaker Laptop</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300..900&display=swap"><link rel="stylesheet" href="style.css"></head>
+<body class="audio-page"><div class="stage"><div class="phone">
+<header class="master-top"><a class="master-brand" href="index.html">DIVIDUAL<span>TM</span></a><div class="master-kicker">AUDIO PLAYER · SPEAKER LAPTOP</div></header>
+<main class="audio-main">
+<section id="login" class="master-panel" style="max-width:650px;margin:45px auto 0"><div class="master-panel-top">SECURE AUDIO COMPUTER</div><div class="master-panel-body">
+<h2>Unlock the audio player</h2><p class="master-help">Enter the same key used for Master Control.</p>
+<form id="loginForm"><label class="input-label" for="key">MASTER KEY</label><input id="key" type="password" autocomplete="current-password" required style="width:100%;padding:10px"><div class="master-primary-actions"><button class="master-btn primary" type="submit">UNLOCK →</button></div></form><p id="loginError" role="status" class="feedback"></p>
+</div></section>
+<section id="desk" hidden>
+<div class="master-heading"><div><div class="eyebrow">ONLY THESE TWO TRACKS</div><h1>Audio<span class="accent">.</span></h1></div><span class="master-status" id="connection">CONNECTING…</span></div>
+<p class="master-intro">Connect this laptop to the speakers. Enable audio once, then leave this page open.</p>
+<section class="master-panel audio-control"><div class="master-panel-top">SPEAKER OUTPUT</div><div class="master-panel-body audio-control-body">
+  <div id="orb" class="audio-orb">◉</div><h2 id="mainStatus">Audio not enabled</h2><p class="master-help" id="subStatus">Click the button below to unlock browser playback.</p>
+  <div class="master-primary-actions"><button class="master-btn primary" id="enable">ENABLE AUDIO</button></div>
+  <div class="audio-track-grid"><div class="audio-track" id="privateTrack"><strong>PRIVATELY</strong><small id="privateFile">Not checked</small><button class="master-btn secondary" id="localPrivate" disabled>TEST PRIVATE</button></div><div class="audio-track" id="publicTrack"><strong>PUBLICLY</strong><small id="publicFile">Not checked</small><button class="master-btn secondary" id="localPublic" disabled>TEST PUBLIC</button></div></div>
+  <p id="feedback" class="master-note" role="status">No ambience, chimes or speech. Only your two MP3s.</p>
+</div></section>
+<section class="master-panel"><div class="master-panel-top">LIVE SOUND LOG</div><div class="master-panel-body"><div id="feed" class="master-feed"><p class="master-empty">Waiting for visitors…</p></div></div></section>
+<p class="master-bottom">Keep this computer awake, connected to Render and connected to the speakers.</p>
+</section>
+</main></div></div>
+<script>
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const tracks={private:'/audio/Privately.mp3',public:'/audio/Publicly.mp3'};
+  let authenticated=false,ctx=null,gain=null,buffers={},stream=null,armed=false,muted=false,volume=0.8,loading=false;
+  let playing=false,queue=[],received=new Set(),log=[];
+  async function api(path,method='GET',body){
+    const r=await fetch(path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    let obj={};try{obj=await r.json();}catch{}
+    if(!r.ok)throw new Error(obj.error||'Connection failed');return obj;
+  }
+  const setInfo=(main,sub)=>{$('mainStatus').textContent=main;$('subStatus').textContent=sub;};
+  function showLogin(){authenticated=false;$('login').hidden=false;$('desk').hidden=true;}
+  async function showDesk(){authenticated=true;$('login').hidden=true;$('desk').hidden=false;try{const x=await api('/api/admin/state');muted=!x.soundEnabled;volume=x.volume;startStream();}catch(e){setInfo('Cannot connect',e.message);}ping();}
+  $('loginForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/admin/login','POST',{key:$('key').value});$('key').value='';await showDesk();}catch(err){$('loginError').textContent=err.message;}};
+  function writeLog(msg){const row=document.createElement('div');row.className='audio-log';const time=document.createElement('time');time.textContent=new Date().toLocaleTimeString();const text=document.createElement('span');text.textContent=msg;row.append(text,time);log.unshift(row);if(log.length>20)log.pop();$('feed').replaceChildren(...log);}
+  function isReady(){return armed && Boolean(ctx) && Boolean(buffers.private) && Boolean(buffers.public) && ctx.state==='running';}
+  function showStatus(){
+    $('connection').textContent=!stream?'○ OFFLINE':'● CONNECTED';
+    $('connection').className='master-status'+(stream&&isReady()?' connected':'');
+    if(!armed) setInfo('Audio not enabled','Click ENABLE AUDIO on this computer.');
+    else if(!buffers.private||!buffers.public) setInfo('Audio files missing','Upload Privately.mp3 and Publicly.mp3 to audio/');
+    else if(muted) setInfo('Muted from master','Enable sounds from Master Control to resume.');
+    else if(ctx?.state!=='running') setInfo('Audio suspended','Click ENABLE AUDIO again to resume browser playback.');
+    else if(!playing) setInfo('Ready for visitors','Both tracks loaded. Waiting for a share.');
+    $('privateFile').textContent=buffers.private?'✓ File loaded':'✕ Missing file';
+    $('publicFile').textContent=buffers.public?'✓ File loaded':'✕ Missing file';
+    $('localPrivate').disabled=!buffers.private||!armed;
+    $('localPublic').disabled=!buffers.public||!armed;
+    $('orb').classList.toggle('ready',isReady()&&!muted);
+  }
+  async function loadTrack(which){
+    const r=await fetch(tracks[which],{cache:'no-cache'});
+    if(!r.ok)throw new Error(tracks[which]+' is missing ('+r.status+').');
+    const array=await r.arrayBuffer();
+    if(!array.byteLength)throw new Error(tracks[which]+' is empty.');
+    return await ctx.decodeAudioData(array);
+  }
+  async function enableAudio(){
+    if(loading)return;loading=true;$('enable').disabled=true;$('enable').textContent='LOADING TWO MP3s…';
+    try {
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(!AudioCtx)throw new Error('This browser does not support Web Audio.');
+      if(!ctx){ctx=new AudioCtx();gain=ctx.createGain();gain.gain.value=volume;gain.connect(ctx.destination);}
+      await ctx.resume(); // MUST originate from the user clicking ENABLE AUDIO.
+      const loaded=await Promise.allSettled([loadTrack('private'),loadTrack('public')]);
+      buffers.private=loaded[0].status==='fulfilled'?loaded[0].value:null;
+      buffers.public=loaded[1].status==='fulfilled'?loaded[1].value:null;
+      armed=true;
+      const fails=loaded.filter(x=>x.status==='rejected').map(x=>x.reason.message);
+      $('feedback').textContent=fails.length?fails.join(' '):'Both MP3s ready. Leave this tab open.';
+      $('enable').textContent='RECHECK / RE-ENABLE AUDIO';
+      writeLog(fails.length?'Audio files need attention':'Audio enabled');
+    }catch(err){$('feedback').textContent=err.message;$('enable').textContent='TRY AGAIN';}
+    finally{loading=false;$('enable').disabled=false;showStatus();ping();}
+  }
+  $('enable').onclick=enableAudio;
+  function enqueue(which,test=false){
+    if(!buffers[which]||!armed){writeLog(`${which.toUpperCase()} cue not ready`);return;}
+    if(!test && muted){writeLog(`${which.toUpperCase()} received (muted)`);return;}
+    queue.push({which,test});processQueue();
+  }
+  async function processQueue(){
+    if(playing)return;playing=true;
+    while(queue.length){
+      const {which,test}=queue.shift();
+      if(!ctx||ctx.state!=='running'){writeLog('Audio suspended; re-enable this page');continue;}
+      if(!test && muted){writeLog('Cue skipped because sound is muted');continue;}
+      setInfo(which==='private'?'Playing PRIVATELY':'Playing PUBLICLY', test?'Manual test':'Visitor share received');
+      $('orb').classList.add('pulse');
+      await new Promise(resolve=>{
+        const src=ctx.createBufferSource();src.buffer=buffers[which];src.connect(gain);src.onended=resolve;
+        try{src.start(0);}catch(e){$('feedback').textContent=e.message;resolve();}
+      });
+      $('orb').classList.remove('pulse');
+      writeLog(`${test?'TEST':'PLAYED'} · ${which.toUpperCase()}`);
+    }
+    playing=false;showStatus();
+  }
+  $('localPrivate').onclick=()=>enqueue('private',true);
+  $('localPublic').onclick=()=>enqueue('public',true);
+  function receive(e){
+    let x;try{x=JSON.parse(e.data);}catch{return;}
+    if(received.has(x.seq))return;
+    received.add(x.seq);if(received.size>500){const first=received.values().next().value;received.delete(first);}
+    if(x.kind==='share'){
+      const which=x.visibility==='private'?'private':'public';
+      if(armed)enqueue(which);else writeLog(`${which.toUpperCase()} received — audio not enabled`);
+    }
+    if(x.kind==='control'){
+      if(x.action==='arm')muted=false;
+      if(x.action==='mute')muted=true;
+      if(x.action==='volume' && typeof x.value==='number'){volume=x.value;if(gain)gain.gain.value=volume;}
+      if(x.action==='test-private')enqueue('private',true);
+      if(x.action==='test-public')enqueue('public',true);
+      showStatus();
+    }
+  }
+  function startStream(){
+    if(stream)stream.close();
+    stream=new EventSource('/api/events');
+    stream.addEventListener('signal',receive);
+    stream.onopen=()=>{showStatus();writeLog('Connected to Render');};
+    stream.onerror=()=>{$('connection').textContent='○ RECONNECTING…';};
+  }
+  async function ping(){
+    if(!authenticated)return;
+    try{await api('/api/player/ping','POST',{ready:isReady(),privateLoaded:!!buffers.private,publicLoaded:!!buffers.public,error:$('feedback').textContent.slice(0,120)});}catch{}
+  }
+  setInterval(()=>{ping();showStatus();},8000);
+  api('/api/admin/state').then(showDesk).catch(showLogin);
+})();
+</script></body></html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b57ff">
+  <title>DIVIDUAL — Recover Your Voice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300..900&display=swap" />
+<link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+</head>
+<body class="visitor-page"><div class="stage"><div class="phone">
+  <header class="site-header"><div class="wrap">
+    <a class="brand" href="index.html" aria-label="Dividual home"><div class="mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="currentColor" transform="translate(60 60)"><rect x="-10" y="-52" width="20" height="42" rx="6"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(180)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(60)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(120)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(240)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(300)"/><circle r="7"/></g></svg></div><div class="word">Dividual<span class="tm">TM</span></div></a>
+    <nav class="nav" aria-label="Main navigation"><a class="active" href="index.html">CREATE</a><a href="answers.html">READ POEMS</a></nav>
+  </div></header>
+
+  <main class="wrap">
+    <div id="steps" class="steps" aria-label="Poem progress" hidden></div>
+    <div id="screen" aria-live="polite"></div>
+    <p class="mode-msg" id="connection"></p>
+  </main>
+  <footer class="footer">Dividual Systems<span class="tm">TM</span></footer>
+
+  <script>
+  (() => {
+    'use strict';
+    const D = window.Dividual;
+    const draftKey = 'dividual_render_draft_v2';
+    const screen = document.getElementById('screen');
+    const steps = document.getElementById('steps');
+    document.getElementById('connection').textContent = '';
+
+    const initial = () => ({ unlocked: [false, false, false], answers: ['', '', ''], active: 0, view: 'intro', releasedId: '' });
+    function load() {
+      try {
+        const old = JSON.parse(localStorage.getItem(draftKey) || '{}');
+        if (!Array.isArray(old.unlocked) || old.unlocked.length !== 3 || !Array.isArray(old.answers) || old.answers.length !== 3) return initial();
+        const view = ['intro', 'edit', 'gate', 'finish', 'private', 'released'].includes(old.view) ? old.view : 'intro';
+        return { ...initial(), ...old, view };
+      } catch { return initial(); }
+    }
+    let state = load();
+    function persist() { try { localStorage.setItem(draftKey, JSON.stringify(state)); } catch { /* private mode */ } }
+    function elem(tag, className, text) {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+    function showError(message) {
+      const feedback = document.getElementById('feedback');
+      if (feedback) { feedback.className = 'feedback error'; feedback.textContent = message; }
+    }
+    function renderSteps() {
+      steps.replaceChildren();
+      steps.hidden = !state.unlocked.some(Boolean) || state.view === 'released';
+      D.config.poems.forEach((p, i) => {
+        const b = elem('button', 'step' + (state.active === i && state.view === 'edit' ? ' current' : '') + (state.answers[i] ? ' done' : ''), `${i + 1}`);
+        b.type = 'button';
+        b.setAttribute('aria-label', `Edit fragment ${i + 1}`);
+        b.disabled = !state.unlocked[i] || state.view === 'released';
+        b.onclick = () => { state.active = i; state.view = 'edit'; persist(); render(); };
+        steps.append(b);
+      });
+    }
+    function render() {
+      renderSteps();
+      screen.replaceChildren();
+      window.scrollTo(0, 0);
+      if (state.view === 'intro') return intro();
+      if (state.view === 'edit') return edit();
+      if (state.view === 'gate') return gate();
+      if (state.view === 'finish') return finish();
+      if (state.view === 'private') return privateView();
+      if (state.view === 'released') return released();
+    }
+    function intro() {
+      screen.innerHTML = `
+        <section class="intro-hero">
+          <div class="eyebrow">3 FRAGMENTS · 1 POEM</div>
+          <h1>Make a<br>poem<span class="accent">.</span></h1>
+          <p class="lead">Find a QR card. Fill in the missing words.<br>Repeat three times.</p>
+        </section>
+        <section class="panel padded action-card">
+          <h2>Find the first QR card.</h2>
+          <p class="muted">Scan it, or enter its code.</p>
+          <form id="codeForm">
+            <label class="sr-only" for="code">Station code</label>
+            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN FRAGMENT →</button></div>
+          </form>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>`;
+      document.getElementById('codeForm').onsubmit = event => { event.preventDefault(); unlock(document.getElementById('code').value); };
+    }
+    function edit() {
+      const idx = state.active;
+      if (!state.unlocked[idx]) { state.view = 'intro'; return render(); }
+      const item = D.config.poems[idx];
+      screen.innerHTML = `
+        <div class="eyebrow light-label">FRAGMENT ${idx + 1} OF 3</div>
+        <section class="panel padded action-card">
+          <h2 id="prompt"></h2>
+          <div class="verse" id="verse"></div>
+          <form id="answerForm">
+            <label class="input-label" for="answer">YOUR WORDS</label>
+            <input id="answer" type="text" maxlength="72" required autocomplete="off" placeholder="Finish the line…" aria-describedby="prompt">
+            <div class="actions"><button class="btn" type="submit">SAVE & CONTINUE →</button></div>
+          </form>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>`;
+      document.getElementById('prompt').textContent = item.prompt;
+      const input = document.getElementById('answer');
+      const verse = document.getElementById('verse');
+      input.value = state.answers[idx];
+      function livePreview() { D.appendVerse(verse, item.template, input.value.trim()); }
+      input.addEventListener('input', livePreview);
+      livePreview();
+      document.getElementById('answerForm').onsubmit = event => {
+        event.preventDefault();
+        const answer = input.value.trim();
+        if (!answer) return showError('Write a word or short phrase first.');
+        state.answers[idx] = answer;
+        const firstMissing = state.answers.findIndex((value, i) => state.unlocked[i] && !value);
+        const nextLocked = state.unlocked.findIndex(x => !x);
+        if (state.answers.every(Boolean)) state.view = 'finish';
+        else if (firstMissing >= 0) { state.active = firstMissing; state.view = 'edit'; }
+        else if (nextLocked >= 0) state.view = 'gate';
+        else state.view = 'finish';
+        persist(); render();
+      };
+    }
+    function gate() {
+      const next = state.unlocked.findIndex(x => !x);
+      if (next < 0) { state.view = 'finish'; return render(); }
+      screen.innerHTML = `
+        <div class="eyebrow light-label">${next} OF 3 FRAGMENTS DONE ✓</div>
+        <h1>Find the<br>next QR<span class="accent">.</span></h1>
+        <section class="panel padded action-card">
+          <h2>Station ${next + 1}</h2>
+          <p class="muted">Scan its QR code, or enter the code below.</p>
+          <form id="codeForm">
+            <label class="sr-only" for="code">Station code</label>
+            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN FRAGMENT →</button></div>
+          </form>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>`;
+      document.getElementById('codeForm').onsubmit = event => { event.preventDefault(); unlock(document.getElementById('code').value); };
+    }
+    function preview(parent) { D.renderPoem(parent, state.answers); }
+    function finish() {
+      screen.innerHTML = `
+        <div class="eyebrow light-label">3 OF 3 · COMPLETE ✓</div>
+        <h1>Your poem<span class="accent">.</span></h1>
+        <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
+        <section class="finish-actions">
+          <h2>What next?</h2>
+          <div class="actions"><button class="btn" id="keep" type="button">SHARE PRIVATELY</button><button class="btn ghost" id="release" type="button">SHARE ANONYMOUSLY ↗</button></div>
+          <p class="privacy-note">Private = only on your phone. Anonymous = visible to everyone.</p>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>`;
+      preview(document.getElementById('fullPoem'));
+      document.getElementById('keep').onclick = keepPrivate;
+      document.getElementById('release').onclick = release;
+    }
+    function privateView() {
+      screen.innerHTML = `
+        <div class="eyebrow light-label">SHARED PRIVATELY ✓</div>
+        <h1>Just for you<span class="accent">.</span></h1>
+        <p class="lead">Only you can read your words. Your private sound has been sent.</p>
+        <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
+        <div class="actions"><a class="btn" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div>`;
+      preview(document.getElementById('fullPoem'));
+      document.getElementById('restart').onclick = restart;
+    }
+    function released() {
+      screen.innerHTML = `
+        <div class="eyebrow light-label">POEM SHARED ✓</div>
+        <h1>Your voice<br>is out there<span class="accent">.</span></h1>
+        <p class="lead">Your poem is now in the public archive.</p>
+        <section class="panel padded voice-id-card"><div class="eyebrow">FIND YOUR POEM</div><h2 id="voiceId"></h2></section>
+        <div class="actions"><a class="btn" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div>`;
+      document.getElementById('voiceId').textContent = D.voiceId(state.releasedId);
+      document.getElementById('restart').onclick = restart;
+    }
+    function restart() {
+      if (!confirm('Start again? This will clear your current draft on this phone. Any already-released poem will stay in the archive.')) return;
+      state = initial(); persist(); render();
+    }
+    function unlock(raw) {
+      const code = raw.trim().toUpperCase();
+      const idx = D.config.poems.findIndex(p => p.code.toUpperCase() === code);
+      if (idx < 0) return showError('Code not recognised. Check the card and try again.');
+      const next = state.unlocked.findIndex(x => !x);
+      if (next !== -1 && idx > next) return showError('Start with the first QR card.');
+      if (idx > 0 && !state.answers[idx - 1]) return showError('Finish the previous fragment first.');
+      if (state.view === 'released') return;
+      state.unlocked[idx] = true;
+      state.active = idx;
+      state.view = 'edit';
+      persist();
+      try { history.replaceState(null, '', window.location.pathname); } catch { /* local file */ }
+      render();
+    }
+    async function keepPrivate() {
+      const button = document.getElementById('keep');
+      button.disabled = true;
+      button.textContent = 'SHARING...';
+      try {
+        await D.sharePrivate();
+        state.view = 'private';
+        persist(); render();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = 'SHARE PRIVATELY';
+        showError(`Could not send the sound signal: ${error.message}. Try again.`);
+      }
+    }
+    async function release() {
+      const button = document.getElementById('release');
+      button.disabled = true;
+      button.textContent = 'RELEASING...';
+      try {
+        const poem = await D.submit(state.answers);
+        state.releasedId = poem.id;
+        state.view = 'released';
+        persist(); render();
+      } catch (error) {
+        button.disabled = false; button.textContent = 'SHARE ANONYMOUSLY ↗';
+        showError(`Could not release: ${error.message}. Your draft is still here.`);
+      }
+    }
+    // QR codes use index.html?code=F2, etc. Never bypass the journey order.
+    const scanned = new URLSearchParams(location.search).get('code');
+    if (scanned && state.view !== 'released') {
+      render();
+      unlock(scanned);
+    } else {
+      if (state.view === 'intro' && state.unlocked[0]) state.view = 'edit';
+      render();
+    }
+  })();
+  </script>
+</div></div></body>
+</html>

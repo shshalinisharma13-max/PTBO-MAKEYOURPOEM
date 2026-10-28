@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DIVIDUAL — Master Control</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300..900&display=swap"><link rel="stylesheet" href="style.css"></head>
+<body class="master-page"><div class="stage"><div class="phone">
+<header class="master-top"><a href="index.html" class="master-brand">DIVIDUAL<span>TM</span></a><div class="master-kicker">MASTER CONTROL · NO AUDIO HERE</div></header>
+<main class="master-main">
+  <section id="login" class="master-panel" style="max-width:600px;margin:50px auto 0"><div class="master-panel-top">SECURE CONTROL</div><div class="master-panel-body">
+    <h2>Enter master key</h2><p class="master-help">Use the ADMIN_KEY you've set on Render.</p>
+    <form id="authForm"><label class="input-label" for="key">MASTER KEY</label><input style="width:100%;padding:10px" id="key" type="password" required autocomplete="current-password"><div class="master-primary-actions"><button class="master-btn primary" type="submit">UNLOCK MASTER →</button></div></form>
+    <p id="loginError" class="feedback" role="status"></p>
+  </div></section>
+  <section id="dashboard" hidden>
+    <div class="master-heading"><div><div class="eyebrow">INSTALLATION OVERVIEW</div><h1>Master<span class="accent">.</span></h1></div><div id="playerBadge" class="master-status">CHECKING PLAYER…</div></div>
+    <p class="master-intro">Control the sounds. Watch the audience. Playback happens only on the Audio Laptop.</p>
+    <div class="master-stat-row"><div class="master-stat"><div class="master-number" id="privateCount">0</div><div class="master-stat-label">PRIVATE SHARES<br>THIS SERVER SESSION</div></div><div class="master-stat"><div class="master-number" id="publicCount">0</div><div class="master-stat-label">PUBLIC POEMS<br>IN ARCHIVE</div></div></div>
+    <div class="master-layout">
+      <div class="master-stack">
+        <section class="master-panel"><div class="master-panel-top">SPEAKER CONTROLS <span id="enabledLabel" class="master-mini-status"></span></div><div class="master-panel-body">
+          <h2>Remote playback</h2><p class="master-help">The audio computer must have Audio Player open and enabled.</p>
+          <div class="master-primary-actions"><button class="master-btn primary" id="arm">ENABLE SOUNDS</button><button class="master-btn secondary" id="mute">MUTE SOUNDS</button></div>
+          <div class="master-divider"></div>
+          <div class="master-field-label">TEST THE TWO MP3s</div>
+          <div class="master-primary-actions"><button class="master-btn secondary" id="testPrivate">▶ PRIVATELY</button><button class="master-btn secondary" id="testPublic">▶ PUBLICLY</button></div>
+          <div class="master-slider-label"><label class="master-field-label" for="volume">OUTPUT VOLUME</label><output id="volumeText">80%</output></div><input class="master-range" id="volume" type="range" min="0" max="100" step="5" value="80">
+          <p id="feedback" class="master-note" role="status"></p>
+        </div></section>
+        <section class="master-panel"><div class="master-panel-top">SPEAKER LAPTOP</div><div class="master-panel-body">
+          <h2 id="playerInfo">Not connected</h2><p id="playerFiles" class="master-help">Open audio.html on the speaker computer.</p>
+          <a class="master-link" href="audio.html" target="_blank" rel="noopener">OPEN AUDIO PLAYER ↗</a>
+        </div></section>
+      </div>
+      <div class="master-stack">
+        <section class="master-panel"><div class="master-panel-top">RECENT ACTIVITY</div><div class="master-panel-body"><div id="activity" class="master-feed"><p class="master-empty">No events yet.</p></div></div></section>
+        <section class="master-panel"><div class="master-panel-top">PUBLIC POETRY</div><div class="master-panel-body"><p class="master-help">Private poems never appear here.</p><a class="master-link" href="answers.html" target="_blank">READ PUBLIC ARCHIVE ↗</a><a class="master-link" href="cards.html" target="_blank">PRINT QR CARDS ↗</a></div></section>
+      </div>
+    </div>
+    <p class="master-bottom">MASTER CONTROL · Monitor only · Never plays sound from this browser</p>
+  </section>
+</main></div></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let authenticated = false, connecting = false, stream, state;
+  async function api(path, method='GET', body) {
+    const res = await fetch(path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    let data={}; try{data=await res.json();}catch{}
+    if(!res.ok) throw new Error(data.error||'Connection failed');
+    return data;
+  }
+  function report(txt,error=false){$('feedback').textContent=txt;$('feedback').style.color=error?'#c02450':'#513a5a';}
+  function logRow(e){
+    const el=document.createElement('div');el.className='master-voice';
+    const head=document.createElement('div');head.className='master-voice-head';
+    const type=document.createElement('b');
+    type.textContent=e.kind==='share' ? (e.visibility==='private'?'🔒 PRIVATE SHARE':'↗ ANONYMOUS SHARE') : `⚙ ${e.action||'CONTROL'}`;
+    const time=document.createElement('time'); time.textContent=new Date(e.at).toLocaleTimeString();
+    head.append(type,time);el.append(head);
+    if(e.poem){const body=document.createElement('p');body.textContent=[e.poem.a,e.poem.b,e.poem.c].join(' · ');el.append(body);}
+    return el;
+  }
+  function render(data){
+    state=data;
+    $('privateCount').textContent=data.privateCount;
+    $('publicCount').textContent=data.publicCount;
+    $('enabledLabel').textContent=data.soundEnabled?'ENABLED':'MUTED';
+    $('arm').disabled=data.soundEnabled;
+    $('mute').disabled=!data.soundEnabled;
+    $('volume').value=Math.round(data.volume*100);$('volumeText').textContent=Math.round(data.volume*100)+'%';
+    const p=data.player;
+    $('playerBadge').textContent=p.online ? (p.ready?'● PLAYER READY':'● PLAYER CONNECTED / NOT READY'):'○ PLAYER OFFLINE';
+    $('playerBadge').className='master-status'+(p.online&&p.ready?' connected':'');
+    $('playerInfo').textContent=p.online?(p.ready?'Audio laptop ready':'Audio laptop not armed'):'No audio laptop connected';
+    $('playerFiles').textContent=p.online?`Privately.mp3: ${p.privateLoaded?'READY':'MISSING'} · Publicly.mp3: ${p.publicLoaded?'READY':'MISSING'}${p.error?' · '+p.error:''}`:'Open audio.html on a separate computer and press ENABLE AUDIO.';
+    const act=$('activity');act.replaceChildren();
+    if(!data.recent.length){const em=document.createElement('p');em.className='master-empty';em.textContent='No events yet.';act.append(em);}
+    else data.recent.forEach(x=>act.append(logRow(x)));
+  }
+  async function refresh(){if(!authenticated)return;try{render(await api('/api/admin/state'));}catch(e){if(e.message.includes('master key')){authenticated=false;showLogin();}else report(e.message,true);}}
+  function showLogin(){ $('login').hidden=false;$('dashboard').hidden=true; }
+  function showDash(){ $('login').hidden=true;$('dashboard').hidden=false;refresh();if(!connecting){connecting=true;stream=new EventSource('/api/events');stream.addEventListener('signal',refresh);}}
+  $('authForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/admin/login','POST',{key:$('key').value});$('key').value='';authenticated=true;showDash();}catch(err){$('loginError').textContent=err.message;}};
+  async function control(action,value){try{await api('/api/admin/control','POST',{action,...(value===undefined?{}:{value})});report(action.startsWith('test')?'Test cue sent to the speaker laptop.':`Control sent: ${action}.`);await refresh();}catch(e){report(e.message,true);}}
+  $('arm').onclick=()=>control('arm'); $('mute').onclick=()=>control('mute');
+  $('testPrivate').onclick=()=>control('test-private'); $('testPublic').onclick=()=>control('test-public');
+  $('volume').onchange=e=>control('volume',Number(e.target.value)/100);
+  api('/api/admin/state').then(()=>{authenticated=true;showDash();}).catch(showLogin);
+  setInterval(refresh,3500);
+})();
+</script>
+</body></html>
