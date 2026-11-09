@@ -8,7 +8,7 @@
   <header class="site-header"><div class="wrap"><a class="brand" href="index.html" aria-label="Dividual home"><div class="mark" aria-hidden="true"><svg viewBox="0 0 120 120"><g fill="currentColor" transform="translate(60 60)"><rect x="-10" y="-52" width="20" height="42" rx="6"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(180)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(60)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(120)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(240)"/><rect x="-10" y="10" width="20" height="42" rx="6" transform="rotate(300)"/><circle r="7"/></g></svg></div><div class="word">Dividual<span class="tm">TM</span></div></a><nav class="nav"><a href="index.html">VISITOR VIEW</a><a href="answers.html">PUBLIC ARCHIVE</a></nav></div></header>
   <main class="wrap">
     <section class="no-print"><div class="eyebrow">INSTALLATION TOOLS</div><h1>Print your<br>QR cards<span style="color:var(--lime)">.</span></h1>
-      <p class="lead">After publishing the project, paste the address of your live <code>index.html</code> here. Generate, then print these three station cards and hide them around the installation.</p>
+      <p class="lead">After publishing the project, paste the address of your live <code>index.html</code> here. Generate, then print these three code cards and hide them around the installation.</p>
       <label class="input-label" for="base">VISITOR PAGE URL</label><input id="base" type="url" placeholder="https://yourusername.github.io/your-repo/index.html">
       <div class="actions"><button class="btn" id="generate">GENERATE QR CODES</button><button class="btn ghost" onclick="window.print()">PRINT CARDS</button></div><p class="feedback" id="status" role="status"></p><p class="small muted">Each QR opens <code>index.html?code=...</code>. Visitors can also type the large printed code manually. QR rendering uses a tiny online library; the poetry site itself doesn't depend on it.</p>
     </section>
@@ -29,11 +29,11 @@
       catch { status.className = 'feedback error'; status.textContent = 'Please enter the full published https:// visitor page address.'; return; }
       window.DIVIDUAL_CONFIG.poems.forEach((p, i) => {
         const card = document.createElement('article'); card.className = 'qr-card';
-        const h = document.createElement('h3'); h.textContent = `STATION 0${i + 1}`;
+        const h = document.createElement('h3'); h.textContent = `CODE ${i + 1}`;
         const prompt = document.createElement('p'); prompt.textContent = p.heading;
         const qr = document.createElement('div'); qr.className = 'qr-frame';
         const code = document.createElement('h3'); code.textContent = p.code;
-        const footer = document.createElement('p'); footer.textContent = 'SCAN OR ENTER THE CODE';
+        const footer = document.createElement('p'); footer.textContent = 'SCAN OR TYPE THIS CODE';
         card.append(h, prompt, qr, code, footer); cards.append(card);
         const target = new URL(base.href); target.search = ''; target.searchParams.set('code', p.code);
         if (typeof QRCode === 'function') {

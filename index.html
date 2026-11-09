@@ -100,7 +100,7 @@
       D.config.poems.forEach((p, i) => {
         const b = elem('button', 'step' + (state.active === i && state.view === 'edit' ? ' current' : '') + (state.answers[i] ? ' done' : ''), `${i + 1}`);
         b.type = 'button';
-        b.setAttribute('aria-label', `Edit fragment ${i + 1}`);
+        b.setAttribute('aria-label', `Edit part ${i + 1}`);
         b.disabled = !state.unlocked[i] || state.view === 'released';
         b.onclick = () => { state.active = i; state.view = 'edit'; persist(); render(); };
         steps.append(b);
@@ -120,16 +120,16 @@
     function intro() {
       screen.innerHTML = `
         <section class="intro-hero">
-          <div class="eyebrow">3 FRAGMENTS · 1 POEM</div>
+          <div class="eyebrow">3 PARTS · 1 POEM</div>
           <h1>Make a<br>poem<span class="accent">.</span></h1>
-          <p class="lead">Find a QR card. Fill in the missing words.<br>Repeat three times.</p>
+          <p class="lead">1. Find code 1 in the installation.<br>2. Fill in the blank with your own words.<br>3. Repeat for all 3 parts.</p>
         </section>
         <section class="panel padded action-card">
-          <h2>Find the first QR card.</h2>
-          <p class="muted">Scan it, or enter its code.</p>
+          <h2>Find code 1</h2>
+          <p class="muted">Scan its QR code, or type the code below.</p>
           <form id="codeForm">
-            <label class="sr-only" for="code">Station code</label>
-            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN FRAGMENT →</button></div>
+            <label class="sr-only" for="code">Code</label>
+            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN PART →</button></div>
           </form>
           <p class="feedback" id="feedback" role="status"></p>
         </section>`;
@@ -140,14 +140,15 @@
       if (!state.unlocked[idx]) { state.view = 'intro'; return render(); }
       const item = D.config.poems[idx];
       screen.innerHTML = `
-        <div class="eyebrow light-label">FRAGMENT ${idx + 1} OF 3</div>
+        <div class="eyebrow light-label">PART ${idx + 1} OF 3</div>
         <section class="panel padded action-card">
           <h2 id="prompt"></h2>
+          <p class="muted">Fill in the blank with your own words.</p>
           <div class="verse" id="verse"></div>
           <form id="answerForm">
             <label class="input-label" for="answer">YOUR WORDS</label>
-            <input id="answer" type="text" maxlength="72" required autocomplete="off" placeholder="Finish the line…" aria-describedby="prompt">
-            <div class="actions"><button class="btn" type="submit">SAVE & CONTINUE →</button></div>
+            <input id="answer" type="text" maxlength="72" required autocomplete="off" placeholder="Your words here…" aria-describedby="prompt">
+            <div class="actions"><button class="btn" type="submit">${idx === 2 ? 'FINISH POEM →' : 'SAVE & CONTINUE →'}</button></div>
           </form>
           <p class="feedback" id="feedback" role="status"></p>
         </section>`;
@@ -176,14 +177,14 @@
       const next = state.unlocked.findIndex(x => !x);
       if (next < 0) { state.view = 'finish'; return render(); }
       screen.innerHTML = `
-        <div class="eyebrow light-label">${next} OF 3 FRAGMENTS DONE ✓</div>
-        <h1>Find the<br>next QR<span class="accent">.</span></h1>
+        <div class="eyebrow light-label">${next} OF 3 PARTS DONE ✓</div>
+        <h1>Find the<br>next code<span class="accent">.</span></h1>
         <section class="panel padded action-card">
-          <h2>Station ${next + 1}</h2>
-          <p class="muted">Scan its QR code, or enter the code below.</p>
+          <h2>Find code ${next + 1}</h2>
+          <p class="muted">Scan its QR code, or type the code below.</p>
           <form id="codeForm">
-            <label class="sr-only" for="code">Station code</label>
-            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN FRAGMENT →</button></div>
+            <label class="sr-only" for="code">Code</label>
+            <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN PART →</button></div>
           </form>
           <p class="feedback" id="feedback" role="status"></p>
         </section>`;
@@ -192,13 +193,13 @@
     function preview(parent) { D.renderPoem(parent, state.answers); }
     function finish() {
       screen.innerHTML = `
-        <div class="eyebrow light-label">3 OF 3 · COMPLETE ✓</div>
-        <h1>Your poem<span class="accent">.</span></h1>
+        <div class="eyebrow light-label">3 OF 3 PARTS DONE ✓</div>
+        <h1>Your poem is ready<span class="accent">.</span></h1>
         <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
         <section class="finish-actions">
-          <h2>What next?</h2>
-          <div class="actions"><button class="btn" id="keep" type="button">SHARE PRIVATELY</button><button class="btn ghost" id="release" type="button">SHARE ANONYMOUSLY ↗</button></div>
-          <p class="privacy-note">Private = only on your phone. Anonymous = visible to everyone. Audio plays on this phone after you share.</p>
+          <h2>Who can read your poem?</h2>
+          <div class="actions"><button class="btn" id="keep" type="button">KEEP PRIVATE</button><button class="btn ghost" id="release" type="button">SHARE ANONYMOUSLY ↗</button></div>
+          <p class="privacy-note">Private: only you can read it. Anonymous: everyone can read it, without your name. Sound plays on your phone.</p>
           <p class="feedback" id="feedback" role="status"></p>
           <p class="feedback" id="soundFeedback" role="status"></p>
         </section>`;
@@ -210,9 +211,9 @@
       screen.innerHTML = `
         <div class="eyebrow light-label">SHARED PRIVATELY ✓</div>
         <h1>Just for you<span class="accent">.</span></h1>
-        <p class="lead">Only you can read your words. Your private sound plays on this phone.</p>
+        <p class="lead">Your poem stays on this phone. Listen to your sound below.</p>
         <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
-        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">PHONE AUDIO · Use the player below if you cannot hear the sound.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">No sound? Press play below.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       preview(document.getElementById('fullPoem'));
       document.getElementById('restart').onclick = restart;
       document.getElementById('replaySound').onclick = () => playPhoneAudio('private');
@@ -224,10 +225,10 @@
     function released() {
       screen.innerHTML = `
         <div class="eyebrow light-label">POEM SHARED ✓</div>
-        <h1>Your voice<br>is out there<span class="accent">.</span></h1>
-        <p class="lead">Your poem is now in the public archive. The sound plays on your phone.</p>
+        <h1>Poem<br>shared<span class="accent">.</span></h1>
+        <p class="lead">Others can now read your poem. Listen to your sound below.</p>
         <section class="panel padded voice-id-card"><div class="eyebrow">FIND YOUR POEM</div><h2 id="voiceId"></h2></section>
-        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">PHONE AUDIO · Use the player below if you cannot hear the sound.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">No sound? Press play below.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       document.getElementById('voiceId').textContent = D.voiceId(state.releasedId);
       document.getElementById('restart').onclick = restart;
       document.getElementById('replaySound').onclick = () => playPhoneAudio('public');
@@ -237,7 +238,7 @@
       showPhoneAudioError();
     }
     function restart() {
-      if (!confirm('Start again? This will clear your current draft on this phone. Any already-released poem will stay in the archive.')) return;
+      if (!confirm('Start a new poem? This clears the current poem from your phone. Poems shared anonymously stay in the archive.')) return;
       stopPhoneAudio();
       phoneAudioError = '';
       state = initial(); persist(); render();
@@ -245,10 +246,10 @@
     function unlock(raw) {
       const code = raw.trim().toUpperCase();
       const idx = D.config.poems.findIndex(p => p.code.toUpperCase() === code);
-      if (idx < 0) return showError('Code not recognised. Check the card and try again.');
+      if (idx < 0) return showError('That code did not work. Try again.');
       const next = state.unlocked.findIndex(x => !x);
-      if (next !== -1 && idx > next) return showError('Start with the first QR card.');
-      if (idx > 0 && !state.answers[idx - 1]) return showError('Finish the previous fragment first.');
+      if (next !== -1 && idx > next) return showError('Start with code 1.');
+      if (idx > 0 && !state.answers[idx - 1]) return showError('Finish the previous part first.');
       if (state.view === 'released') return;
       state.unlocked[idx] = true;
       state.active = idx;
@@ -268,8 +269,8 @@
         persist(); render();
       } catch (error) {
         button.disabled = false;
-        button.textContent = 'SHARE PRIVATELY';
-        showError(`Could not register private share: ${error.message}. Try again.`);
+        button.textContent = 'KEEP PRIVATE';
+        showError(`Could not keep your poem private: ${error.message}. Try again.`);
       }
     }
     async function release() {
@@ -284,7 +285,7 @@
         persist(); render();
       } catch (error) {
         button.disabled = false; button.textContent = 'SHARE ANONYMOUSLY ↗';
-        showError(`Could not release: ${error.message}. Your draft is still here.`);
+        showError(`Could not share your poem: ${error.message}. Your draft is still here.`);
       }
     }
     // QR codes use index.html?code=F2, etc. Never bypass the journey order.
