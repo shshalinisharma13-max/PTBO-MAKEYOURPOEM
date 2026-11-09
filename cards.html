@@ -29,7 +29,7 @@
       catch { status.className = 'feedback error'; status.textContent = 'Please enter the full published https:// visitor page address.'; return; }
       window.DIVIDUAL_CONFIG.poems.forEach((p, i) => {
         const card = document.createElement('article'); card.className = 'qr-card';
-        const h = document.createElement('h3'); h.textContent = `CODE ${i + 1}`;
+        const h = document.createElement('h3'); h.textContent = 'POEM CODE';
         const prompt = document.createElement('p'); prompt.textContent = p.heading;
         const qr = document.createElement('div'); qr.className = 'qr-frame';
         const code = document.createElement('h3'); code.textContent = p.code;

@@ -122,11 +122,11 @@
         <section class="intro-hero">
           <div class="eyebrow">3 PARTS · 1 POEM</div>
           <h1>Make a<br>poem<span class="accent">.</span></h1>
-          <p class="lead">1. Find code 1 in the installation.<br>2. Fill in the blank with your own words.<br>3. Repeat for all 3 parts.</p>
+          <p class="lead">1. Find any code in the installation.<br>2. Fill in the blank with your own words.<br>3. Find the other two codes and repeat.</p>
         </section>
         <section class="panel padded action-card">
-          <h2>Find code 1</h2>
-          <p class="muted">Scan its QR code, or type the code below.</p>
+          <h2>Find any code</h2>
+          <p class="muted">Scan the QR code, or type the code below. Any order!</p>
           <form id="codeForm">
             <label class="sr-only" for="code">Code</label>
             <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN PART →</button></div>
@@ -148,7 +148,7 @@
           <form id="answerForm">
             <label class="input-label" for="answer">YOUR WORDS</label>
             <input id="answer" type="text" maxlength="72" required autocomplete="off" placeholder="Your words here…" aria-describedby="prompt">
-            <div class="actions"><button class="btn" type="submit">${idx === 2 ? 'FINISH POEM →' : 'SAVE & CONTINUE →'}</button></div>
+            <div class="actions"><button class="btn" type="submit">${state.unlocked.every(Boolean) && state.answers.every((answer, i) => i === idx || Boolean(answer)) ? 'FINISH POEM →' : 'SAVE & CONTINUE →'}</button></div>
           </form>
           <p class="feedback" id="feedback" role="status"></p>
         </section>`;
@@ -166,7 +166,7 @@
         state.answers[idx] = answer;
         const firstMissing = state.answers.findIndex((value, i) => state.unlocked[i] && !value);
         const nextLocked = state.unlocked.findIndex(x => !x);
-        if (state.answers.every(Boolean)) state.view = 'finish';
+        if (state.unlocked.every(Boolean) && state.answers.every(Boolean)) state.view = 'finish';
         else if (firstMissing >= 0) { state.active = firstMissing; state.view = 'edit'; }
         else if (nextLocked >= 0) state.view = 'gate';
         else state.view = 'finish';
@@ -175,13 +175,19 @@
     }
     function gate() {
       const next = state.unlocked.findIndex(x => !x);
-      if (next < 0) { state.view = 'finish'; return render(); }
+      if (next < 0) {
+        const unanswered = state.answers.findIndex(answer => !answer);
+        state.active = unanswered >= 0 ? unanswered : state.active;
+        state.view = unanswered >= 0 ? 'edit' : 'finish';
+        return render();
+      }
+      const completed = state.answers.filter(Boolean).length;
       screen.innerHTML = `
-        <div class="eyebrow light-label">${next} OF 3 PARTS DONE ✓</div>
+        <div class="eyebrow light-label">${completed} OF 3 PARTS DONE ✓</div>
         <h1>Find the<br>next code<span class="accent">.</span></h1>
         <section class="panel padded action-card">
-          <h2>Find code ${next + 1}</h2>
-          <p class="muted">Scan its QR code, or type the code below.</p>
+          <h2>Find another code</h2>
+          <p class="muted">Scan the QR code, or type the code below. Any order!</p>
           <form id="codeForm">
             <label class="sr-only" for="code">Code</label>
             <div class="field-row"><input id="code" type="text" maxlength="12" placeholder="Enter code" autocapitalize="characters" autocomplete="off" spellcheck="false" required><button class="btn" type="submit">OPEN PART →</button></div>
@@ -247,9 +253,7 @@
       const code = raw.trim().toUpperCase();
       const idx = D.config.poems.findIndex(p => p.code.toUpperCase() === code);
       if (idx < 0) return showError('That code did not work. Try again.');
-      const next = state.unlocked.findIndex(x => !x);
-      if (next !== -1 && idx > next) return showError('Start with code 1.');
-      if (idx > 0 && !state.answers[idx - 1]) return showError('Finish the previous part first.');
+      // Each valid code independently unlocks its own poem part.
       if (state.view === 'released') return;
       state.unlocked[idx] = true;
       state.active = idx;
@@ -288,13 +292,17 @@
         showError(`Could not share your poem: ${error.message}. Your draft is still here.`);
       }
     }
-    // QR codes use index.html?code=F2, etc. Never bypass the journey order.
+    // QR codes use index.html?code=F2/K7/D9; all three can be scanned in any order.
     const scanned = new URLSearchParams(location.search).get('code');
     if (scanned && state.view !== 'released') {
       render();
       unlock(scanned);
     } else {
-      if (state.view === 'intro' && state.unlocked[0]) state.view = 'edit';
+      if (state.view === 'intro' && state.unlocked.some(Boolean)) {
+        const unanswered = state.unlocked.findIndex((unlocked, i) => unlocked && !state.answers[i]);
+        if (unanswered >= 0) { state.active = unanswered; state.view = 'edit'; }
+        else state.view = 'gate';
+      }
       render();
     }
   })();

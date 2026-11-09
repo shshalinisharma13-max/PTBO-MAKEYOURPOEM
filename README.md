@@ -1,6 +1,6 @@
 # DIVIDUAL — audience-phone audio
 
-This Push the Boat Out installation runs as a single Node.js web service on Render. Audience phones scan three QR cards, write a poem and choose how to share.
+This Push the Boat Out installation runs as a single Node.js web service on Render. Audience phones scan or enter **F2, K7 and D9 in any order**, write one part for each code, and choose how to share only after all three parts are complete.
 
 **Audio plays only on the audience member's own phone. No second audio browser or speaker laptop is needed.**
 
@@ -34,7 +34,7 @@ The repository already includes **audio/Privately.mp3** and **audio/Publicly.mp3
 
 ## Rehearsal checklist
 
-1. On an iPhone using Safari and an Android using Chrome, visit your Render audience page and finish all three fragments.
+1. On an iPhone using Safari and an Android using Chrome, enter the three codes in different orders (e.g. D9 → F2 → K7 or K7 → D9 → F2). All three unique codes are required. Invalid codes are rejected and repeating a code does not count as a new part.
 2. Share privately. Verify **only that phone** plays Privately.mp3, and the master private counter increases.
 3. Share anonymously. Verify **only that phone** plays Publicly.mp3 and the poem appears in /answers.html.
 4. Try **REPLAY SOUND**, and have two phones share at the same time. Each should play its own independent audio.
