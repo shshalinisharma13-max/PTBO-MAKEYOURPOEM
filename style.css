@@ -210,3 +210,7 @@ input:focus{background:white}input::placeholder{color:#826e86}#code{font-size:cl
 .audio-page .master-panel{margin-bottom:20px}
 .audio-page #feedback{overflow-wrap:anywhere}
 @media(max-width:550px){.audio-track-grid{grid-template-columns:1fr}.audio-page .master-heading{display:block}.audio-page .master-status{max-width:none;display:inline-block;margin:20px 0}}
+
+/* Native mobile audio controls provide a manual playback fallback. */
+.phone-audio-fallback { margin: 18px 0; max-width: 480px; }
+.phone-audio-fallback audio { display: block; width: 100%; max-width: 100%; }

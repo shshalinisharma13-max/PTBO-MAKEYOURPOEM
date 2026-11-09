@@ -198,7 +198,7 @@
         <section class="finish-actions">
           <h2>What next?</h2>
           <div class="actions"><button class="btn" id="keep" type="button">SHARE PRIVATELY</button><button class="btn ghost" id="release" type="button">SHARE ANONYMOUSLY ↗</button></div>
-          <p class="privacy-note">Private = only on your phone. Anonymous = visible to everyone.</p>
+          <p class="privacy-note">Private = only on your phone. Anonymous = visible to everyone. Audio plays on this phone after you share.</p>
           <p class="feedback" id="feedback" role="status"></p>
           <p class="feedback" id="soundFeedback" role="status"></p>
         </section>`;
@@ -212,10 +212,13 @@
         <h1>Just for you<span class="accent">.</span></h1>
         <p class="lead">Only you can read your words. Your private sound plays on this phone.</p>
         <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
-        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div><p class="feedback" id="soundFeedback" role="status"></p>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">PHONE AUDIO · Use the player below if you cannot hear the sound.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       preview(document.getElementById('fullPoem'));
       document.getElementById('restart').onclick = restart;
       document.getElementById('replaySound').onclick = () => playPhoneAudio('private');
+      phoneAudio.private.controls = true;
+      phoneAudio.private.setAttribute('aria-label', 'Private poem sound');
+      document.getElementById('nativeAudio').append(phoneAudio.private);
       showPhoneAudioError();
     }
     function released() {
@@ -224,10 +227,13 @@
         <h1>Your voice<br>is out there<span class="accent">.</span></h1>
         <p class="lead">Your poem is now in the public archive. The sound plays on your phone.</p>
         <section class="panel padded voice-id-card"><div class="eyebrow">FIND YOUR POEM</div><h2 id="voiceId"></h2></section>
-        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div><p class="feedback" id="soundFeedback" role="status"></p>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div><div class="phone-audio-fallback"><p class="privacy-note">PHONE AUDIO · Use the player below if you cannot hear the sound.</p><div id="nativeAudio"></div></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       document.getElementById('voiceId').textContent = D.voiceId(state.releasedId);
       document.getElementById('restart').onclick = restart;
       document.getElementById('replaySound').onclick = () => playPhoneAudio('public');
+      phoneAudio.public.controls = true;
+      phoneAudio.public.setAttribute('aria-label', 'Anonymous poem sound');
+      document.getElementById('nativeAudio').append(phoneAudio.public);
       showPhoneAudioError();
     }
     function restart() {
