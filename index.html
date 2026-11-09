@@ -29,6 +29,45 @@
   (() => {
     'use strict';
     const D = window.Dividual;
+
+    // Audio is local to the participant's phone. play() must run before fetch/await.
+    const phoneAudio = {
+      private: new Audio('audio/Privately.mp3'),
+      public: new Audio('audio/Publicly.mp3')
+    };
+    Object.values(phoneAudio).forEach(sound => { sound.preload = 'auto'; });
+    let phoneAudioError = '';
+    let audioAttempt = 0;
+    function showPhoneAudioError() {
+      const node = document.getElementById('soundFeedback');
+      if (node) node.textContent = phoneAudioError;
+    }
+    function stopPhoneAudio() {
+      ++audioAttempt;
+      for (const sound of Object.values(phoneAudio)) {
+        sound.pause();
+        try { sound.currentTime = 0; } catch { /* no seekable data yet */ }
+      }
+    }
+    function playPhoneAudio(which) {
+      stopPhoneAudio();
+      const attempt = audioAttempt;
+      phoneAudioError = '';
+      showPhoneAudioError();
+      try {
+        const playback = phoneAudio[which].play();
+        if (playback && typeof playback.catch === 'function') {
+          playback.catch(() => {
+            if (attempt !== audioAttempt) return;
+            phoneAudioError = 'Audio could not play. Check your phone media volume, then tap REPLAY SOUND.';
+            showPhoneAudioError();
+          });
+        }
+      } catch {
+        phoneAudioError = 'Audio could not start. Tap REPLAY SOUND to try again.';
+        showPhoneAudioError();
+      }
+    }
     const draftKey = 'dividual_render_draft_v2';
     const screen = document.getElementById('screen');
     const steps = document.getElementById('steps');
@@ -161,6 +200,7 @@
           <div class="actions"><button class="btn" id="keep" type="button">SHARE PRIVATELY</button><button class="btn ghost" id="release" type="button">SHARE ANONYMOUSLY ↗</button></div>
           <p class="privacy-note">Private = only on your phone. Anonymous = visible to everyone.</p>
           <p class="feedback" id="feedback" role="status"></p>
+          <p class="feedback" id="soundFeedback" role="status"></p>
         </section>`;
       preview(document.getElementById('fullPoem'));
       document.getElementById('keep').onclick = keepPrivate;
@@ -170,24 +210,30 @@
       screen.innerHTML = `
         <div class="eyebrow light-label">SHARED PRIVATELY ✓</div>
         <h1>Just for you<span class="accent">.</span></h1>
-        <p class="lead">Only you can read your words. Your private sound has been sent.</p>
+        <p class="lead">Only you can read your words. Your private sound plays on this phone.</p>
         <section class="panel padded"><div id="fullPoem" class="assembled-poem"></div></section>
-        <div class="actions"><a class="btn" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS</a><button class="btn ghost" id="restart">NEW POEM</button></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       preview(document.getElementById('fullPoem'));
       document.getElementById('restart').onclick = restart;
+      document.getElementById('replaySound').onclick = () => playPhoneAudio('private');
+      showPhoneAudioError();
     }
     function released() {
       screen.innerHTML = `
         <div class="eyebrow light-label">POEM SHARED ✓</div>
         <h1>Your voice<br>is out there<span class="accent">.</span></h1>
-        <p class="lead">Your poem is now in the public archive.</p>
+        <p class="lead">Your poem is now in the public archive. The sound plays on your phone.</p>
         <section class="panel padded voice-id-card"><div class="eyebrow">FIND YOUR POEM</div><h2 id="voiceId"></h2></section>
-        <div class="actions"><a class="btn" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div>`;
+        <div class="actions"><button class="btn" id="replaySound" type="button">▶ REPLAY SOUND</button><a class="btn ghost" href="answers.html">READ POEMS ↗</a><button class="btn ghost" id="restart">NEW POEM</button></div><p class="feedback" id="soundFeedback" role="status"></p>`;
       document.getElementById('voiceId').textContent = D.voiceId(state.releasedId);
       document.getElementById('restart').onclick = restart;
+      document.getElementById('replaySound').onclick = () => playPhoneAudio('public');
+      showPhoneAudioError();
     }
     function restart() {
       if (!confirm('Start again? This will clear your current draft on this phone. Any already-released poem will stay in the archive.')) return;
+      stopPhoneAudio();
+      phoneAudioError = '';
       state = initial(); persist(); render();
     }
     function unlock(raw) {
@@ -206,6 +252,7 @@
       render();
     }
     async function keepPrivate() {
+      playPhoneAudio('private'); // User tap; synchronous before network request.
       const button = document.getElementById('keep');
       button.disabled = true;
       button.textContent = 'SHARING...';
@@ -216,10 +263,11 @@
       } catch (error) {
         button.disabled = false;
         button.textContent = 'SHARE PRIVATELY';
-        showError(`Could not send the sound signal: ${error.message}. Try again.`);
+        showError(`Could not register private share: ${error.message}. Try again.`);
       }
     }
     async function release() {
+      playPhoneAudio('public'); // User tap; synchronous before network request.
       const button = document.getElementById('release');
       button.disabled = true;
       button.textContent = 'RELEASING...';

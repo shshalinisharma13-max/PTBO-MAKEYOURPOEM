@@ -1,101 +1,47 @@
-# DIVIDUAL — Render-only, three-page installation
+# DIVIDUAL — audience-phone audio
 
-This version uses **one Node.js Web Service on Render** for all communications. **No Firebase, no other backend and no npm dependencies**. It has only TWO automatic audio cues, played from the separate speaker laptop:
+This Push the Boat Out installation runs as a single Node.js web service on Render. Audience phones scan three QR cards, write a poem and choose how to share.
 
-- **SHARE PRIVATELY → `audio/Privately.mp3`** (the poem text NEVER leaves the visitor's device).
-- **SHARE ANONYMOUSLY → `audio/Publicly.mp3`** (the poem is saved to the public archive).
+**Audio plays only on the audience member's own phone. No second audio browser or speaker laptop is needed.**
 
-**The MP3 recordings are NOT bundled.** Add your actual audio files with those exact filenames and extension. File names are case-sensitive on Render.
+- **Share Privately:** the phone plays audio/Privately.mp3. The poem text remains in the phone browser; the server receives only a private-share activity event (without any poem text).
+- **Share Anonymously:** the phone plays audio/Publicly.mp3 and publishes the three answers to the public archive.
+- Each confirmation screen has a **REPLAY SOUND** button. Phone media volume must be turned up.
+- The master dashboard shows private/public counts and recent activity, but does not play or control sound.
+- The retired /audio.html page is only an informational notice; /sound.html redirects there.
 
-## Three main pages
+Phone playback starts directly from the share-button tap, before the server request, to satisfy mobile browser playback restrictions. The MP3 endpoint also supports HTTP byte-range requests for iPhone Safari.
 
-| Device | Page | Purpose |
-|---|---|---|
-| Audience phones | `https://YOUR-SITE.onrender.com/` | Scan QR, fill three fragments, share privately or anonymously |
-| Your control computer | `https://YOUR-SITE.onrender.com/master.html` | Counts, public activity, speaker online status, mute/unmute, volume, and private/public test buttons |
-| Speaker laptop | `https://YOUR-SITE.onrender.com/audio.html` | **Only this computer plays MP3 files** when triggered |
+## Pages
 
-Extras: `/answers.html` = public archive, `/cards.html` = printable QR cards. `sound.html` redirects to `/audio.html` for old links.
+| Address | Purpose |
+| --- | --- |
+| / or /index.html | Audience poem creator and phone playback |
+| /answers.html | Public poem archive |
+| /cards.html | Printable QR cards |
+| /master.html | Password-protected activity dashboard (no audio) |
+| /audio.html | Retired player notice (no audio) |
 
-## 1. Add your two MP3s
+## Deploy
 
-In the website folder, open `audio/` and add:
+The repository already includes **audio/Privately.mp3** and **audio/Publicly.mp3**. Keep the filenames and casing exactly as shown, or replace these files with final recordings.
 
-```
-DIVIDUAL_Render_3_Pages/
-  server.js
-  package.json
-  render.yaml
-  index.html
-  master.html
-  audio.html
-  answers.html
-  cards.html
-  core.js
-  config.js
-  style.css
-  Copy of outline eye.png
-  audio/
-    Privately.mp3  <-- YOUR recording
-    Publicly.mp3   <-- YOUR recording
-```
+1. Connect this repo's **main** branch to a Render **Web Service** (not a Static Site).
+2. Use Node.js, build command **npm install**, start command **npm start**, and root directory left blank.
+3. Set a strong secret **ADMIN_KEY** as a Render environment variable. Use it to sign in at /master.html; never add the key to GitHub.
+4. Deploy the new main commit. If Render auto-deploy is enabled, the push should trigger it.
+5. Print QR cards from **/cards.html** at your actual Render service address. Old GitHub Pages QR codes may point elsewhere.
 
-Do **not** rename them `privately.mp3` or `Privately.mp3.mp3`. There is no ambient sound, generated chime, or spoken line. If the correct MP3s are missing, the speaker page displays an error **and plays no substitute sound**.
+## Rehearsal checklist
 
-## 2. Host entirely on Render
+1. On an iPhone using Safari and an Android using Chrome, visit your Render audience page and finish all three fragments.
+2. Share privately. Verify **only that phone** plays Privately.mp3, and the master private counter increases.
+3. Share anonymously. Verify **only that phone** plays Publicly.mp3 and the poem appears in /answers.html.
+4. Try **REPLAY SOUND**, and have two phones share at the same time. Each should play its own independent audio.
+5. Open /audio.html and /master.html to confirm neither acts as a speaker player.
 
-If you previously deployed DIVIDUAL as a **Static Site**, make a **new Web Service** for this version instead. A Static Site cannot relay live messages to another laptop by itself.
+## Storage and reliability
 
-1. Put **the contents of this folder** in the root of a GitHub repository (not in an extra nested folder). Include your two MP3 files.
-2. Go to [Render Dashboard](https://dashboard.render.com/) → **New → Web Service** → select your GitHub repository.
-3. Use:
-   - **Language/runtime:** Node
-   - **Build command:** `npm install`
-   - **Start command:** `npm start`
-   - **Root directory:** leave blank if files are at the repo root
-   - **Instance:** Free for rehearsals, **paid recommended for the public show**
-4. Add an **Environment Variable**: name `ADMIN_KEY`, value **a unique strong password of your choosing**. You will enter the exact same key on both `master.html` and `audio.html` (on different computers). Never put the value inside GitHub source files.
-5. Deploy. Alternatively use Render **New → Blueprint** with `render.yaml`, supply the `ADMIN_KEY` secret when prompted. Use **one** creation method, not both.
-6. Open the URL Render gives you. The audience home page is `/`; the other page paths are above.
-7. Reprint QR codes from the new Web Service's `/cards.html` page. **Old Static Site QR codes point to the previous deployment**, so check the address carefully.
+The default public archive is held in server memory; Render restarts can clear it. For persistence on paid Render, attach a disk and set **DATA_FILE** to a writable location such as /var/data/poems.json. Recent activity and private-share counts are per-server-session. The rate limit is 120 share requests per minute per IP address, which may need consideration at a busy event with shared Wi-Fi. The public archive does not currently provide moderation or deletion tools.
 
-### Important reliability choice
-
-Render's **Free Web Service can spin down after inactivity and can restart at any time**. A restart clears the default in-memory public poem archive and recent event history. Its free filesystem is ephemeral. For a public performance requiring dependable continuous audio and saved poems, use a **paid Render Web Service** and optionally attach a persistent disk.
-
-**Persistent public poems (paid Render option):**
-
-- Attach a Render persistent disk to the Web Service, mounted at `/var/data`.
-- Set a second Render environment variable: `DATA_FILE=/var/data/poems.json`.
-- Restart/redeploy. Only **anonymous public** poems are written to this file. The player cues and private poems are never saved to the archive.
-- Keep the web service at one instance, since this simple live signal relay is in process memory.
-
-Free Render PostgreSQL is also a Render-hosted service, but this particular minimal project avoids requiring a separate database; use a disk for persistent archive or accept temporary storage for a short session.
-
-## 3. Run the installation
-
-1. **Speaker computer:** Open `/audio.html`, enter `ADMIN_KEY`, click **ENABLE AUDIO** once. Confirm both filenames show **File loaded**. Connect its headphone/audio interface to the venue speakers. Keep this tab open, the laptop awake, and system audio unmuted. This one click is required by browser autoplay restrictions.
-2. **Master computer:** Open `/master.html`, enter the same `ADMIN_KEY`. Confirm it says **PLAYER READY**. Use **TEST PRIVATELY** and **TEST PUBLICLY**; listen for the right track on the **speaker computer**, not the master.
-3. **Audience phones:** Open `/` or scan the printed QR cards. They complete F2, K7, and D9. At the end, they choose:
-   - **SHARE PRIVATELY:** the server receives only a *private trigger*; audio laptop plays `Privately.mp3`, and their poem remains in their own browser storage.
-   - **SHARE ANONYMOUSLY:** the server gets three submitted phrases; audio laptop plays `Publicly.mp3`, and the poem appears on `/answers.html`.
-4. **Master:** **MUTE SOUNDS** stops automatic future cues; **ENABLE SOUNDS** resumes them. Remote tests still work while muted so you can soundcheck. Set the output **volume** using the slider. The master has no player and makes no sound.
-
-If two visitors share simultaneously, the speaker page **queues the files one after the other** rather than playing the two MP3s over each other.
-
-## Notes
-
-- The two sound recordings must be provided by you; the package intentionally includes only filename instructions in the `audio/` folder.
-- **One audio player computer** should be armed, or multiple audio pages will each play the sound.
-- The audience UI, poetry fragments, eye graphic, public archive and QR-print utility are retained. To change the placeholder poems/codes, edit `config.js`.
-- Only public poems are visible to others. Avoid requesting visitors' names or personal information. Anonymity is not content moderation; the public archive currently has no pre-approval or administrative deletion UI. Use for a monitored installation.
-- The server rate-limits submissions to 120 per minute per source IP; with many visitors sharing a Wi-Fi network this limit may need adjusting (`server.js`, `rateLimit`).
-- Test with real audience phones on their own network/mobile data and the venue's separate speaker computer **before** your show.
-
-## Local test (optional)
-
-```sh
-ADMIN_KEY=my-test-master-key npm start
-```
-
-Then open `http://localhost:3000/`, `http://localhost:3000/master.html` and `http://localhost:3000/audio.html` in separate browser windows. Different devices on the same network should use your Render URL, not localhost.
+To test on a computer locally: set ADMIN_KEY and run **npm start**, then open http://localhost:3000. Real mobile testing requires the HTTPS Render deployment.

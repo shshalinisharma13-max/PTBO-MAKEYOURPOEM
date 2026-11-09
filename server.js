@@ -14,14 +14,11 @@ const MAX_BODY = 6000;
 const MAX_SSE = 50;
 const SESSION_HOURS = 12;
 let poems = [];
-let soundEnabled = true;
-let volume = 0.8;
 let privateCountSinceStart = 0;
 let eventNumber = 0;
 const history = [];
 const listeners = new Set();
 const rate = new Map();
-let player = { seen: 0, ready: false, privateLoaded: false, publicLoaded: false, error: '' };
 
 if (DATA_FILE && fs.existsSync(DATA_FILE)) {
   try {
@@ -106,7 +103,31 @@ function staticFile(req, res, url) {
   if (!st.isFile()) return error(res, 404, 'File not found.');
   const ext = path.extname(filepath).toLowerCase();
   const mime = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'application/javascript; charset=utf-8', '.png':'image/png', '.mp3':'audio/mpeg', '.ico':'image/x-icon' }[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': mime, 'Content-Length': st.size, 'Cache-Control': ext === '.mp3' ? 'public, max-age=3600' : 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy':'same-origin' });
+  const headers = { 'Content-Type': mime, 'Cache-Control': ext === '.mp3' ? 'public, max-age=3600' : 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' };
+  if (ext === '.mp3') headers['Accept-Ranges'] = 'bytes';
+  // iOS Safari and other mobile media players may request partial MP3 content.
+  if (ext === '.mp3' && req.headers.range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range).trim());
+    const unsatisfiable = () => {
+      res.writeHead(416, { ...headers, 'Content-Range': 'bytes */' + st.size });
+      res.end();
+    };
+    if (!match || (!match[1] && !match[2])) return unsatisfiable();
+    let start, end;
+    if (match[1]) {
+      start = Number(match[1]);
+      end = match[2] ? Number(match[2]) : st.size - 1;
+    } else {
+      start = Math.max(st.size - Number(match[2]), 0);
+      end = st.size - 1;
+    }
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start >= st.size || end < start) return unsatisfiable();
+    end = Math.min(end, st.size - 1);
+    res.writeHead(206, { ...headers, 'Content-Range': 'bytes ' + start + '-' + end + '/' + st.size, 'Content-Length': end - start + 1 });
+    if (req.method === 'HEAD') return res.end();
+    return fs.createReadStream(filepath, { start, end }).pipe(res);
+  }
+  res.writeHead(200, { ...headers, 'Content-Length': st.size });
   if (req.method === 'HEAD') return res.end();
   fs.createReadStream(filepath).pipe(res);
 }
@@ -123,7 +144,7 @@ const server = http.createServer(async (req, res) => {
       if (data.visibility === 'private') {
         // PRIVATE WORDS ARE NEVER REQUESTED, SAVED OR BROADCAST.
         privateCountSinceStart++;
-        publish('share', { visibility:'private' });
+        publish('visitor-share', { visibility:'private' }); // Activity only, no speaker trigger.
         return json(res, 201, { ok:true, visibility:'private' });
       }
       if (!Array.isArray(data.answers) || data.answers.length !== 3 || data.answers.some(x => typeof x !== 'string' || !x.trim() || x.trim().length > 72)) return error(res, 400, 'Complete the three poem fragments first.');
@@ -131,7 +152,7 @@ const server = http.createServer(async (req, res) => {
       const poem = { id: crypto.randomUUID(), a, b, c, createdAt: Date.now() };
       try { persistPoems([...poems, poem].slice(-MAX_POEMS)); }
       catch (e) { console.error('Archive write failed', e); return error(res, 500, 'Could not save the poem.'); }
-      publish('share', { visibility:'public', poem });
+      publish('visitor-share', { visibility:'public', poem }); // Activity only, no speaker trigger.
       return json(res, 201, { ok:true, id:poem.id, visibility:'public' });
     }
     if (url.pathname === '/api/admin/login' && req.method === 'POST') {
@@ -148,29 +169,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/admin/state' && req.method === 'GET') {
       if (!requireAdmin(req,res)) return;
-      return json(res, 200, { soundEnabled, volume, privateCount:privateCountSinceStart, publicCount:poems.length, recent:history.slice(-30).reverse().map(e => ({seq:e.seq,kind:e.kind,visibility:e.visibility,at:e.at,poem:e.poem})), player:{...player, online:Date.now()-player.seen < 18000} });
-    }
-    if (url.pathname === '/api/admin/control' && req.method === 'POST') {
-      if (!requireAdmin(req,res)) return;
-      if (!sameOrigin(req)) return error(res, 403, 'Origin not permitted.');
-      const body = await parseJson(req);
-      const action = body?.action;
-      if (!['arm','mute','test-private','test-public','volume'].includes(action)) return error(res, 400, 'Unknown control.');
-      if (action === 'arm') soundEnabled = true;
-      if (action === 'mute') soundEnabled = false;
-      if (action === 'volume') {
-        if (typeof body.value !== 'number' || !Number.isFinite(body.value) || body.value < 0 || body.value > 1) return error(res, 400, 'Volume must be between 0 and 1.');
-        volume = body.value;
-      }
-      publish('control', { action, value:action==='volume'? volume:undefined });
-      return json(res, 200, { ok:true, soundEnabled, volume });
-    }
-    if (url.pathname === '/api/player/ping' && req.method === 'POST') {
-      if (!requireAdmin(req,res)) return;
-      if (!sameOrigin(req)) return error(res, 403, 'Origin not permitted.');
-      const body = await parseJson(req);
-      player = { seen:Date.now(), ready:body.ready===true, privateLoaded:body.privateLoaded===true, publicLoaded:body.publicLoaded===true, error:String(body.error||'').slice(0,150) };
-      return json(res, 200, { ok:true });
+      return json(res, 200, { privateCount:privateCountSinceStart, publicCount:poems.length, recent:history.slice(-30).reverse().map(e => ({seq:e.seq,kind:e.kind,visibility:e.visibility,at:e.at,poem:e.poem})) });
     }
     if (url.pathname === '/api/events' && req.method === 'GET') {
       if (!requireAdmin(req,res)) return;
